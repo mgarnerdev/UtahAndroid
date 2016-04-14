@@ -90,13 +90,13 @@ public class MemberListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
             @Override
             public void onFailure(Call call, final IOException e) {
+                mIsLoading = false;
+                if (BuildConfig.DEBUG) {
+                    e.printStackTrace();
+                }
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        mIsLoading = false;
-                        if (BuildConfig.DEBUG) {
-                            e.printStackTrace();
-                        }
                         if (mLoadListener != null) {
                             mLoadListener.onMembersLoadedFailure();
                             mLoadListener.onLoadFinished();
@@ -107,6 +107,18 @@ public class MemberListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
             @Override
             public void onResponse(Call call, final Response response) throws IOException {
+                if (!response.isSuccessful()) {
+                    throw new IOException("Unexpected code " + response);
+                }
+                final MemberResponse memberResponse = MemberUtils.handleMemberResponse(response);
+                mTotalMembers = memberResponse.getTotalMembers();
+                if (BuildConfig.DEBUG) {
+                    Headers responseHeaders = response.headers();
+                    for (int i = 0, size = responseHeaders.size(); i < size; i++) {
+                        Log.d(MemberListAdapter.class.getSimpleName(), responseHeaders.name(i) + ": " + responseHeaders.value(i));
+                    }
+                    Log.d(MemberListAdapter.class.getSimpleName(), response.body().string());
+                }
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -119,19 +131,11 @@ public class MemberListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                 }
                                 throw new IOException("Unexpected code " + response);
                             }
-                            MemberResponse memberResponse = MemberUtils.handleMemberResponse(response);
-                            mTotalMembers = memberResponse.getTotalMembers();
                             setMemberList(memberResponse.getMembers());
+
                             if (mLoadListener != null) {
                                 mLoadListener.onMembersLoaded(mMemberList.size());
                                 mLoadListener.onLoadFinished();
-                            }
-                            if (BuildConfig.DEBUG) {
-                                Headers responseHeaders = response.headers();
-                                for (int i = 0, size = responseHeaders.size(); i < size; i++) {
-                                    Log.d(MemberListAdapter.class.getSimpleName(), responseHeaders.name(i) + ": " + responseHeaders.value(i));
-                                }
-                                Log.d(MemberListAdapter.class.getSimpleName(), response.body().string());
                             }
                         } catch (IOException e) {
                             if (BuildConfig.DEBUG) {
